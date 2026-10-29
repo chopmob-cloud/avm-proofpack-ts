@@ -38,9 +38,18 @@ export type MpValue =
 
 export class MsgpackError extends Error {}
 
+/**
+ * Maximum container nesting the decoder will follow. AVM consensus objects nest
+ * only a handful of levels (a txn carries inner txns, a stib wraps a txn), so a
+ * generous fixed cap lets real data through while stopping an attacker-supplied
+ * blob of nested array/map headers from exhausting the call stack.
+ */
+const MAX_DEPTH = 128;
+
 export function decode(input: Uint8Array): MpValue {
   const view = new DataView(input.buffer, input.byteOffset, input.byteLength);
   let offset = 0;
+  let depth = 0;
 
   const need = (n: number): void => {
     if (offset + n > input.byteLength) throw new MsgpackError("truncated input");
@@ -114,13 +123,17 @@ export function decode(input: Uint8Array): MpValue {
   };
 
   const readArray = (len: number): MpValue[] => {
+    if (++depth > MAX_DEPTH) throw new MsgpackError("nesting too deep");
     const out: MpValue[] = [];
     for (let i = 0; i < len; i++) out.push(parse());
+    depth--;
     return out;
   };
   const readMap = (len: number): MpMap => {
+    if (++depth > MAX_DEPTH) throw new MsgpackError("nesting too deep");
     const entries: [unknown, unknown][] = [];
     for (let i = 0; i < len; i++) entries.push([parse(), parse()]);
+    depth--;
     return new MpMap(entries);
   };
 
