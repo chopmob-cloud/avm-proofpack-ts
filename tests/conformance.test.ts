@@ -44,7 +44,7 @@ test("merkle root and proof match Python", () => {
   const proof = merkleProof(leaves, vectors.merkle.index);
   assert.deepEqual(proof.map(hex), vectors.merkle.proof_for_index_2);
   assert.equal(verifyMerkleProof(leaves[vectors.merkle.index], vectors.merkle.index, proof,
-                                 unhex(vectors.merkle.root)), true);
+                                 unhex(vectors.merkle.root), leaves.length), true);
 });
 
 test("merkle proof rejects a tampered leaf", () => {
@@ -52,13 +52,50 @@ test("merkle proof rejects a tampered leaf", () => {
   const proof = vectors.merkle.proof_for_index_2.map(unhex);
   const tampered = Uint8Array.from(leaves[2]);
   tampered[0] ^= 0xff;
-  assert.equal(verifyMerkleProof(tampered, 2, proof, unhex(vectors.merkle.root)), false);
+  assert.equal(verifyMerkleProof(tampered, 2, proof, unhex(vectors.merkle.root), leaves.length),
+               false);
 });
 
 test("merkle proof rejects a wrong index", () => {
   const leaves = vectors.merkle.leaves.map(unhex);
   const proof = vectors.merkle.proof_for_index_2.map(unhex);
-  assert.equal(verifyMerkleProof(leaves[2], 3, proof, unhex(vectors.merkle.root)), false);
+  assert.equal(verifyMerkleProof(leaves[2], 3, proof, unhex(vectors.merkle.root), leaves.length),
+               false);
+});
+
+// Deterministic synthetic trees (leaf = sha256 of its index) exercise the
+// non-power-of-two shapes that real blocks almost always have: the promoted
+// odd node is where index-driven direction used to desync from construction.
+const synthLeaves = (n: number): Uint8Array[] =>
+  Array.from({ length: n }, (_, i) => sha256(Uint8Array.of(i & 0xff, (i >> 8) & 0xff)));
+
+for (const n of [1, 2, 3, 5, 6, 7, 9, 13, 16, 17]) {
+  test(`merkle verifies every index for a ${n}-leaf tree`, () => {
+    const leaves = synthLeaves(n);
+    const root = merkleRoot(leaves);
+    for (let i = 0; i < n; i++) {
+      const proof = merkleProof(leaves, i);
+      assert.equal(verifyMerkleProof(leaves[i], i, proof, root, n), true,
+                   `index ${i} of ${n} should verify`);
+    }
+  });
+}
+
+test("merkle verification binds the index to the tree (no malleability)", () => {
+  const n = 4;
+  const leaves = synthLeaves(n);
+  const root = merkleRoot(leaves);
+  const proof = merkleProof(leaves, 2);
+  assert.equal(verifyMerkleProof(leaves[2], 2, proof, root, n), true);
+  // Indices that used to collide on the low bits of a 2-element proof.
+  for (const bogus of [6, 10, 1026]) {
+    assert.equal(verifyMerkleProof(leaves[2], bogus, proof, root, n), false,
+                 `index ${bogus} must not verify`);
+  }
+  // Out-of-range and malformed inputs are rejected outright.
+  assert.equal(verifyMerkleProof(leaves[2], 2, proof, root, 0), false);
+  assert.equal(verifyMerkleProof(leaves[2], -1, proof, root, n), false);
+  assert.equal(verifyMerkleProof(leaves[2], 2, [...proof, proof[0]], root, n), false);
 });
 
 test("txnMerkleLeaf is domain-separated", () => {
