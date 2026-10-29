@@ -37,6 +37,19 @@ const leaf = txnMerkleLeaf(txnId(txnValue), stibHash(stibBytes));
 objects put arbitrary binary in `str` fields; decoding to a JS string would
 corrupt non-UTF-8 data on re-encode.
 
+### Verifying an inclusion proof
+
+```ts
+import { verifyMerkleProof } from "avm-proofpack-ts";
+
+// leafCount is the total number of leaves in the tree the proof is for.
+const ok = verifyMerkleProof(leaf, index, proof, root, leafCount);
+```
+
+`leafCount` is required: the tree promotes odd nodes unchanged, so the verifier
+must know each level's width to walk it correctly and to bind `index` to the
+tree. See the [changelog](CHANGELOG.md) — this argument is new in v0.2.0.
+
 ## Test
 
 ```bash
