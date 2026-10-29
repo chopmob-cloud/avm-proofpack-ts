@@ -44,22 +44,52 @@ export function merkleProof(leaves: Uint8Array[], index: number): Uint8Array[] {
   return proof;
 }
 
+/**
+ * Verify that `leaf` sits at `index` in a tree of `leafCount` leaves whose root
+ * is `root`.
+ *
+ * The verifier walks the tree the same way `merkleRoot` builds it, so it must
+ * know how wide each level is: a promoted odd node consumes no proof element,
+ * and the combine direction at each level comes from the node's position within
+ * that level. Deriving direction from the raw `index` bits alone (without the
+ * level widths) desyncs on any tree whose leaf count is not a power of two, and
+ * leaves `index` unauthenticated — both are consensus-soundness bugs, so
+ * `leafCount` is required and `index` is bound to it.
+ */
 export function verifyMerkleProof(
   leaf: Uint8Array,
   index: number,
   proof: Uint8Array[],
   root: Uint8Array,
+  leafCount: number,
 ): boolean {
-  if (index < 0 || !Number.isInteger(index)) return false;
-  if (root.byteLength !== 32) return false;
+  if (!Number.isInteger(leafCount) || leafCount <= 0) return false;
+  if (!Number.isInteger(index) || index < 0 || index >= leafCount) return false;
+  if (root.byteLength !== 32 || leaf.byteLength !== 32) return false;
+
   let node = leaf;
   let position = index;
-  for (const sibling of proof) {
-    if (sibling.byteLength !== 32) return false;
-    node = position % 2 === 0 ? sha256(concat(node, sibling)) : sha256(concat(sibling, node));
+  let width = leafCount;
+  let consumed = 0;
+  while (width > 1) {
+    // An odd-width level promotes its last node unchanged: no sibling, no proof
+    // element. Every other node combines with the sibling at position ^ 1.
+    const promoted = position === width - 1 && width % 2 === 1;
+    if (!promoted) {
+      if (consumed >= proof.length) return false;
+      const sibling = proof[consumed++];
+      if (sibling.byteLength !== 32) return false;
+      node = position % 2 === 0 ? sha256(concat(node, sibling)) : sha256(concat(sibling, node));
+    }
     position = Math.floor(position / 2);
+    width = Math.ceil(width / 2);
   }
+  // Reject proofs carrying stray elements the walk never used.
+  if (consumed !== proof.length) return false;
+
+  // Constant-time compare (both operands are public, but it costs nothing).
   if (node.byteLength !== root.byteLength) return false;
-  for (let i = 0; i < node.byteLength; i++) if (node[i] !== root[i]) return false;
-  return true;
+  let diff = 0;
+  for (let i = 0; i < node.byteLength; i++) diff |= node[i] ^ root[i];
+  return diff === 0;
 }
