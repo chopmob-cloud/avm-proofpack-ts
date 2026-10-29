@@ -1,0 +1,29 @@
+{
+  "name": "avm-proofpack-ts",
+  "version": "0.1.0",
+  "description": "Offline Algorand and Voi consensus verification primitives in TypeScript: canonical MessagePack, AVM hashing and Merkle inclusion proofs.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "author": "AlgoVoi <chopmob@gmail.com>",
+  "engines": {
+    "node": ">=22.6"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "test": "node --test tests/conformance.test.ts",
+    "check": "tsc --noEmit"
+  },
+  "keywords": [
+    "algorand",
+    "voi",
+    "avm",
+    "state-proof",
+    "merkle",
+    "msgpack"
+  ]
+}
