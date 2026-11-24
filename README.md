@@ -1,6 +1,6 @@
 # avm-proofpack-ts
 
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE) [![avm-proofpack](https://img.shields.io/badge/avm--proofpack-8A2BE2)](https://github.com/chopmob-cloud/avm-proofpack)
 
 **Offline Algorand and Voi consensus verification primitives in TypeScript.**
 Zero dependencies, no build step, Node 22.6+ (native TypeScript).
